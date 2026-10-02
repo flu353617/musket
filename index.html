@@ -25,6 +25,14 @@ const TOOLS=[
  {n:8,name:'여분 솜',instant:true,when:()=>cotDirt>.6,use:()=>{cotDirt=0;say('솜을 교체했다',1.2);snd(.06,1800,.2)},tip:'청소봉 솜이 많이 더러워졌습니다. 이 칸을 누르면 새 솜으로 교체됩니다.'}];
 const NS=TOOLS.length;
 let camX=innerWidth/2,camY=innerHeight/2,state='title',yaw=0,mx=innerWidth/2,my=innerHeight/2,y0=innerHeight/2,zm=1,ads=0,rv=0,slot=0,rdown=false,mdown=false,tm=0;
+const SAVEKEY='jangjeon-save-v1';let SAVE={},savedRun=false,newRec=false;
+try{SAVE=JSON.parse(localStorage.getItem(SAVEKEY))||{}}catch(e){SAVE={}}
+function recSave(){if(TUT||savedRun)return;savedRun=true;const r=SAVE[TH.name]||{wave:0,score:0,kills:0,runs:0};
+  newRec=wave>r.wave||score>r.score;r.wave=Math.max(r.wave,wave);r.score=Math.max(r.score,score);r.kills+=kills;r.runs++;SAVE[TH.name]=r;
+  try{localStorage.setItem(SAVEKEY,JSON.stringify(SAVE))}catch(e){}}
+const recLine=n=>{const r=SAVE[n];return r?`최고 기록 제 ${r.wave}파 · ${r.score}점 · 누적 ${r.kills}처치`:'아직 기록 없음'};
+const bestLine=()=>recLine(TH.name)+(newRec?'  (신기록!)':'');
+addEventListener('pagehide',()=>{if(state==='play')recSave()});
 let balls=[],shipX=0,kL=0,kR=0,mvDir=0,mvT=null,tutBottom=0,TUT=false,frozen=0,frostFx=0,ramT=0,bolt=0,wx=[],speedMul=1,rateMul=1,enemies=[],smoke=[],marks=[],kills=0,score=0,wave=0,toSpawn=0,spawnT=0,clearT=0,msg='',msgT=0,overT=0,overWhy='';
 // stage: 0 청소 필요, 1 화약 필요, 2 헝겊, 3 구슬, 4 다지기, 5 접시 화약, 6 부싯돌, 7 발사 가능
 let stage=7,charge=1,prime=.8,cupAmt=0,cotDirt=0,rodIn=false,rodDepth=0,wipe=0,ramming=false,ramDepth=0,cupHold=false,primeHold=false,kick=0,flash=0,swX=0,swY=0;
@@ -84,7 +92,7 @@ const cupR=()=>{const k=UK();return{x:W*.1,y:Math.max(222*k+10,H*.4),w:56*k,h:13
 
 let ac;function snd(len,freq,vol){try{ac=ac||new AudioContext();if(ac.state==='suspended')ac.resume();const n=ac.sampleRate*len,b=ac.createBuffer(1,n,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,3);const s=ac.createBufferSource();s.buffer=b;const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=freq;const v=ac.createGain();v.gain.value=vol;s.connect(f);f.connect(v);v.connect(ac.destination);s.start()}catch(e){}}
 function say(t,d){msg=t;msgT=d||1.6}
-function start(){speedMul=1;rateMul=1;enemies=[];smoke=[];marks=[];kills=0;score=0;wave=0;stage=7;charge=1;prime=.8;cupAmt=0;cotDirt=0;rodIn=false;ramming=false;cupHold=false;primeHold=false;slot=0;state='play';props=makeProps();initWx();frozen=0;frostFx=0;marks=[];camX=W/2;camY=H/2;if(MOBILE){mx=camX;my=camY;rdown=false;aimT=null;toolT=null}nextWave();balls=[];shipX=0;yaw=0;kL=kR=0;mvDir=0;if(TH.pirate)say(MOBILE?'◀ ▶ 로 이동 · 해적이 나타나면 쏘세요':'A/D 로 이동 · 해적이 나타나면 쏘세요',4.5);else if(MOBILE)say('드래그로 조준 · 오른쪽 버튼으로 발사',4.5)}
+function start(){savedRun=false;newRec=false;speedMul=1;rateMul=1;enemies=[];smoke=[];marks=[];kills=0;score=0;wave=0;stage=7;charge=1;prime=.8;cupAmt=0;cotDirt=0;rodIn=false;ramming=false;cupHold=false;primeHold=false;slot=0;state='play';props=makeProps();initWx();frozen=0;frostFx=0;marks=[];camX=W/2;camY=H/2;if(MOBILE){mx=camX;my=camY;rdown=false;aimT=null;toolT=null}nextWave();balls=[];shipX=0;yaw=0;kL=kR=0;mvDir=0;if(TH.pirate)say(MOBILE?'◀ ▶ 로 이동 · 해적이 나타나면 쏘세요':'A/D 로 이동 · 해적이 나타나면 쏘세요',4.5);else if(MOBILE)say('드래그로 조준 · 오른쪽 버튼으로 발사',4.5)}
 function nextWave(){if(wave>0){speedMul*=1.01+Math.random()*.04;rateMul*=1.01+Math.random()*.04}wave++;toSpawn=(TH.pirate?3:1)+wave;spawnT=TH.pirate?2:.6;clearT=0;say('제 '+wave+'파',2.4)}
 function startGame(i){TUT=false;TH=THEMES[i];start()}
 function startTutorial(){
@@ -226,7 +234,7 @@ function fire(){
 }
 
 /* ---------- 갱신 ---------- */
-function update(dt){
+function update(dt){if(state==='over')recSave();
   tm+=dt;cv.style.cursor=((state==='title'&&tbHit()>=0)||(state==='map'&&(regHit()>=0||inBack())))?'pointer':'default';
   ads+=(((rdown&&slot===0&&state==='play'&&frozen<=0)?1:0)-ads)*Math.min(1,dt*9);zm=1+.9*ads;
   rv+=((slot>0?1:0)-rv)*Math.min(1,dt*8);
@@ -452,7 +460,7 @@ function draw(){
     if(msgT>0){g.globalAlpha=Math.min(1,msgT);g.textAlign='center';g.font=`700 26px ${SERIF}`;track(2);const my2=TUT?tutBottom+34:H*.16,tw=g.measureText(msg).width,bx=W/2-tw/2-30,bw=tw+60;g.fillStyle='rgba(10,6,3,.64)';g.fillRect(bx,my2-30,bw,44);g.strokeStyle='rgba(101,79,38,.85)';g.lineWidth=1;g.beginPath();g.moveTo(bx,my2-30.5);g.lineTo(bx+bw,my2-30.5);g.moveTo(bx,my2+13.5);g.lineTo(bx+bw,my2+13.5);g.stroke();g.fillStyle='#e8d7a6';g.fillText(msg,W/2+1,my2);track(0);g.globalAlpha=1}
   }
   if(state==='title')titleScreen();if(state==='map')mapScreen();
-  if(state==='over')panel(overWhy,[`제 ${wave}파까지 버텼고 ${kills}명을 쓰러뜨렸습니다.`,`점수 ${score}`],overT>.8?(MOBILE?'화면을 터치하면 지도로':'클릭하면 지도로'):'');
+  if(state==='over')panel(overWhy,[`제 ${wave}파까지 버텼고 ${kills}명을 쓰러뜨렸습니다.`,`점수 ${score}`,bestLine()],overT>.8?(MOBILE?'화면을 터치하면 지도로':'클릭하면 지도로'):'');
   if(MOBILE&&H>W&&Math.min(W,H)<600){g.fillStyle='rgba(6,4,2,.96)';g.fillRect(0,0,W,H);g.fillStyle=C.goldHi;g.textAlign='center';g.font=`700 22px ${SERIF}`;g.fillText('화면을 가로로 돌려주세요',W/2,H/2)}
 }
 function titleScreen(){bgMap();
@@ -473,9 +481,9 @@ function mapScreen(){
   g.save();g.shadowColor='rgba(0,0,0,.8)';g.shadowBlur=30;
   if(MAPIMG.complete&&MAPIMG.naturalWidth)g.drawImage(MAPIMG,R.x,R.y,R.w,R.h);else{g.fillStyle='#b9a273';g.fillRect(R.x,R.y,R.w,R.h)}g.restore();
   if(hv>=0){const q=REGP[hv];g.save();g.beginPath();g.ellipse(R.x+R.w*q[0],R.y+R.h*q[1],R.w*q[2],R.h*q[3],0,0,7);g.fillStyle='rgba(255,240,170,.16)';g.fill();g.shadowColor='#ffd86a';g.shadowBlur=18;g.strokeStyle='rgba(255,226,140,.95)';g.lineWidth=3;g.stroke();g.restore()}
-  g.textAlign='center';const fs=Math.max(15,Math.min(24,R.h*.04)),bw=Math.min(R.w*.8,560),bh=fs*3.1,bx=R.x+R.w/2-bw/2,by=R.y+R.h-bh-R.h*.035;
+  g.textAlign='center';const fs=Math.max(15,Math.min(24,R.h*.04)),bw=Math.min(R.w*.8,560),bh=fs*3.9,bx=R.x+R.w/2-bw/2,by=R.y+R.h-bh-R.h*.035;
   parch(bx,by,bw,bh,hv>=0);
-  if(hv>=0){inkT(THEMES[hv].name,R.x+R.w/2,by+fs*1.25,fs*1.15,'#7a1a10');g.fillStyle='#2e1a0a';g.font=`700 ${Math.max(11,fs*.62)}px ${SERIF}`;g.fillText(THEMES[hv].cap,R.x+R.w/2,by+fs*2.35)}
+  if(hv>=0){inkT(THEMES[hv].name,R.x+R.w/2,by+fs*1.25,fs*1.15,'#7a1a10');g.fillStyle='#2e1a0a';g.font=`700 ${Math.max(11,fs*.62)}px ${SERIF}`;g.fillText(THEMES[hv].cap,R.x+R.w/2,by+fs*2.35);g.fillStyle='#5a3a18';g.fillText(recLine(THEMES[hv].name),R.x+R.w/2,by+fs*3.3)}
   else{g.fillStyle='#2e1a0a';g.font=`800 ${fs}px ${SERIF}`;g.fillText('진군할 지역을 고르시오',R.x+R.w/2,by+bh/2+fs*.3)}
   const b=BACK(),on=inBack();parch(b.x,b.y,b.w,b.h,on);g.fillStyle=on?'#7a1a10':'#2e1a0a';g.font=`800 15px ${SERIF}`;g.fillText('돌아가기',b.x+b.w/2,b.y+b.h/2+5);
 }
