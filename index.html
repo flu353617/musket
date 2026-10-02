@@ -12,7 +12,7 @@ const MAPIMG=new Image();MAPIMG.src='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
 const QS=typeof location==='object'?location.search:'';
 let MOBILE=QS.includes('mobile')?true:QS.includes('pc')?false:((typeof matchMedia==='function'&&matchMedia('(pointer:coarse)').matches)||/Android|iPhone|iPad|iPod/i.test(typeof navigator==='object'?navigator.userAgent:'')||(typeof navigator==='object'&&navigator.maxTouchPoints>1&&/Mac/.test(navigator.platform))),TM=MOBILE?1.35:1,SA=MOBILE?44:0;
 function goMobile(){MOBILE=true;TM=1.35;SA=44}
-const AIMTIPF=()=>MOBILE?'화면을 드래그해 조준하고, 조준 버튼으로 가늠쇠를 켠 뒤 발사 버튼을 누르세요. 총알은 멀수록 아래·오른쪽으로 휩니다. 허수아비 머리를 노려 보세요.':'마우스로 시선을 돌리고, 우클릭을 누른 채 가늠쇠로 조준한 뒤 클릭해 발사하세요. 총알은 멀수록 아래·오른쪽으로 휩니다. 허수아비 머리를 노려 보세요. (R: 시점 재설정)';
+const AIMTIPF=()=>MOBILE?'화면을 드래그해 조준하고, 조준 버튼으로 가늠쇠를 켠 뒤 발사 버튼을 누르세요. 총알은 멀수록 조준점 주변으로 넓게 퍼집니다. 허수아비 머리를 노려 보세요.':'마우스로 시선을 돌리고, 우클릭을 누른 채 가늠쇠로 조준한 뒤 클릭해 발사하세요. 총알은 멀수록 조준점 주변으로 넓게 퍼집니다. 허수아비 머리를 노려 보세요. (R: 시점 재설정)';
 // 새 도구는 이 표에 한 줄만 추가하면 핫바와 튜토리얼에 자동으로 나타납니다 (stage: 이 도구가 필요한 장전 단계)
 const TOOLS=[
  {n:1,name:'청소봉',stage:0,at:'muzzle',tip:'총열을 닦습니다. 청소봉을 꺼내 총구를 누른 뒤, 막대를 총열 안쪽으로 왕복시키세요. 솜이 새까맣게 변하면 더는 닦을 수 없으니 여분 솜으로 교체하세요.'},
@@ -82,7 +82,8 @@ let props=makeProps();initWx();
 const RB=()=>[W*.7,H*.72],RM=()=>[W*.27,H*.3];
 const TB=()=>[{x:W/2-120,y:H*.5,w:240,h:62,t:'게임 시작'},{x:W/2-120,y:H*.5+82,w:240,h:62,t:'튜토리얼'}];
 const tbHit=()=>TB().findIndex(b=>mx>b.x&&mx<b.x+b.w&&my>b.y&&my<b.y+b.h);
-const MAPR=()=>{let w=Math.min(W*.97,1100),h=w/1.5;if(h>H*.95){h=H*.95;w=h*1.5}return{x:(W-w)/2,y:(H-h)/2,w,h}};
+let sel=-1,PREV=null;
+const MAPR=()=>{const aw=sel>=0?W*.6:W*.97;let w=Math.min(aw,1100),h=w/1.5;if(h>H*.95){h=H*.95;w=h*1.5}return{x:sel>=0?W*.01+(aw-w)/2:(W-w)/2,y:(H-h)/2,w,h}};
 const REGP=[[.40,.46,.15,.17],[.60,.25,.13,.14],[.71,.64,.11,.14],[.32,.14,.07,.085]];
 const BACK=()=>{const R=MAPR();return{x:R.x+R.w/2-55,y:R.y+R.h*.035,w:110,h:32}};
 const inBack=()=>mx>=BACK().x&&mx<=BACK().x+BACK().w&&my>=BACK().y&&my<=BACK().y+BACK().h;
@@ -127,7 +128,7 @@ function moved(){
 }
 function down(){
   if(state==='title'){const i=tbHit();if(i===0){unlock();state='map'}else if(i===1){unlock();startTutorial()}return}
-  if(state==='map'){const i=regHit();if(i>=0)startGame(i);else if(inBack())state='title';return}
+  if(state==='map'){if(sel>=0&&inStart()){startGame(sel);return}const i=regHit();if(i>=0){sel=i;genPreview(i)}else if(inBack()){sel=-1;state='title'}return}
   if(state==='over'){if(overT>.8){TUT=false;state='map'}return}
   if(frozen>0)return;
   mdown=true;if(slot===0)fire();else useTool();
@@ -215,7 +216,8 @@ function fire(){
   snd(.7,900,1);
   const dev=Math.abs(q-1),jit=3.6+(1-ads)*45,jx=(Math.random()-.5)*jit,jy=(Math.random()-.5)*jit;
   const rl=.9+.2*Math.random(),sc=Math.random()-.5,f=(1+2*dev)*(pr>1.2?1.3:1);
-  const imp=(d,pxm)=>[W/2+PX()+swX+jx+(.000162*d*d*rl*f+sc*dev*.018*d)*pxm,H/2+swY+jy+.0004*d*d/Math.max(.5,q)*pxm];
+  const sa=Math.random()*6.2832,sr=Math.sqrt(Math.random());
+  const imp=(d,pxm)=>{const Rr=(.1+.009*d)*f*sr;return[W/2+PX()+swX+jx+Math.cos(sa)*Rr*pxm,H/2+swY+jy+Math.sin(sa)*Rr*pxm]};
   const addMark=d=>{const p=proj({a:0,d,wob:0}),pxm=p.h/1.7,[px,py]=imp(d,pxm);const L=TUT?30:3;marks.push({a:yaw+(px-W/2)/zm/W*FOV,d,y:(p.fy-py)/pxm,t:L,life:L})};
   let best=null,near=null,ob=null;
   for(const e of enemies){if(e.dead||e.hid)continue;const p=proj(e),[px,py]=imp(e.d,p.h/1.7),dx=Math.abs(px-p.sx);
@@ -235,7 +237,7 @@ function fire(){
 
 /* ---------- 갱신 ---------- */
 function update(dt){if(state==='over')recSave();
-  tm+=dt;cv.style.cursor=((state==='title'&&tbHit()>=0)||(state==='map'&&(regHit()>=0||inBack())))?'pointer':'default';
+  tm+=dt;cv.style.cursor=((state==='title'&&tbHit()>=0)||(state==='map'&&(regHit()>=0||inBack()||(sel>=0&&inStart()))))?'pointer':'default';
   ads+=(((rdown&&slot===0&&state==='play'&&frozen<=0)?1:0)-ads)*Math.min(1,dt*9);zm=1+.9*ads;
   rv+=((slot>0?1:0)-rv)*Math.min(1,dt*8);
   if(TH.pirate)yaw+=(shipX-yaw)*Math.min(1,dt*8);
@@ -480,12 +482,44 @@ function mapScreen(){
   const R=MAPR(),hv=regHit();
   g.save();g.shadowColor='rgba(0,0,0,.8)';g.shadowBlur=30;
   if(MAPIMG.complete&&MAPIMG.naturalWidth)g.drawImage(MAPIMG,R.x,R.y,R.w,R.h);else{g.fillStyle='#b9a273';g.fillRect(R.x,R.y,R.w,R.h)}g.restore();
-  if(hv>=0){const q=REGP[hv];g.save();g.beginPath();g.ellipse(R.x+R.w*q[0],R.y+R.h*q[1],R.w*q[2],R.h*q[3],0,0,7);g.fillStyle='rgba(255,240,170,.16)';g.fill();g.shadowColor='#ffd86a';g.shadowBlur=18;g.strokeStyle='rgba(255,226,140,.95)';g.lineWidth=3;g.stroke();g.restore()}
+  for(const hi of new Set([hv,sel]))if(hi>=0){const q=REGP[hi];g.save();g.beginPath();g.ellipse(R.x+R.w*q[0],R.y+R.h*q[1],R.w*q[2],R.h*q[3],0,0,7);g.fillStyle='rgba(255,240,170,.16)';g.fill();g.shadowColor='#ffd86a';g.shadowBlur=18;g.strokeStyle='rgba(255,226,140,.95)';g.lineWidth=3;g.stroke();g.restore()}
   g.textAlign='center';const fs=Math.max(15,Math.min(24,R.h*.04)),bw=Math.min(R.w*.8,560),bh=fs*3.9,bx=R.x+R.w/2-bw/2,by=R.y+R.h-bh-R.h*.035;
   parch(bx,by,bw,bh,hv>=0);
   if(hv>=0){inkT(THEMES[hv].name,R.x+R.w/2,by+fs*1.25,fs*1.15,'#7a1a10');g.fillStyle='#2e1a0a';g.font=`700 ${Math.max(11,fs*.62)}px ${SERIF}`;g.fillText(THEMES[hv].cap,R.x+R.w/2,by+fs*2.35);g.fillStyle='#5a3a18';g.fillText(recLine(THEMES[hv].name),R.x+R.w/2,by+fs*3.3)}
   else{g.fillStyle='#2e1a0a';g.font=`800 ${fs}px ${SERIF}`;g.fillText('진군할 지역을 고르시오',R.x+R.w/2,by+bh/2+fs*.3)}
-  const b=BACK(),on=inBack();parch(b.x,b.y,b.w,b.h,on);g.fillStyle=on?'#7a1a10':'#2e1a0a';g.font=`800 15px ${SERIF}`;g.fillText('돌아가기',b.x+b.w/2,b.y+b.h/2+5);
+  const b=BACK(),on=inBack();parch(b.x,b.y,b.w,b.h,on);g.fillStyle=on?'#7a1a10':'#2e1a0a';g.font=`800 15px ${SERIF}`;g.fillText('돌아가기',b.x+b.w/2,b.y+b.h/2+5);if(sel>=0)mapPanel();
+}
+const DESC=['변수 없는 탁 트인 평원입니다. 엄폐물이 드문드문 있고 적이 일정한 속도로 다가옵니다. 처음 시작하기 좋은 지역입니다.','눈보라 몰아치는 설원입니다. 초당 1% 확률로 몸이 얼어붙어 2초 동안 아무것도 할 수 없습니다. 장전 도중에 얼면 위험합니다.','안개가 자욱하고 나무가 빽빽한 정글입니다. 시야가 짧아 적이 갑자기 눈앞에 나타납니다.','해적선 위에서 벌이는 포격전입니다. 해적은 모습을 드러내고 1초 뒤 대포를 쏘며, 대포알은 총으로 막을 수 없습니다. 좌우로 움직여 피하세요.'],STARS=[1,4,3,5];
+const PNL=()=>{const R=MAPR(),x=R.x+R.w+W*.012;return{x,y:R.y,w:W-x-W*.012,h:R.h}};
+const STB=()=>{const P=PNL(),h=Math.max(38,P.h*.13);return{x:P.x+P.w*.1,y:P.y+P.h-h-P.h*.06,w:P.w*.8,h}};
+const inStart=()=>{const b=STB();return mx>=b.x&&mx<=b.x+b.w&&my>=b.y&&my<=b.y+b.h};
+function genPreview(i){
+  const sv={TH,props,yaw,y0,zm,enemies,balls,wx};
+  try{
+    TH=THEMES[i];props=makeProps();yaw=0;y0=H*.5;zm=1;balls=[];initWx();
+    const mkE=(a,d)=>({a,d,sp:0,wob:0,dead:false,fall:0,fade:0,dir:1,t:2,fired:1,pirate:!!TH.pirate});
+    enemies=TH.pirate?[mkE(-8,30),mkE(8,30)]:[mkE(-12,10),mkE(14,16),mkE(0,24)];
+    g.save();g.setTransform(DPR,0,0,DPR,0,0);world();
+    const L=[...enemies.map(e=>({d:e.d,f:()=>drawEnemy(e)})),...props.map(o=>({d:o.d,f:()=>drawProp(o)})),...(TH.pirate?[{d:30.5,f:drawShip},{d:29.9,f:drawHull}]:[])].sort((a,b)=>b.d-a.d);
+    for(const o of L)o.f();haze();weather();g.restore();
+    const c=document.createElement('canvas');c.width=Math.max(8,W*.12|0);c.height=Math.max(8,H*.12|0);c.getContext('2d').drawImage(cv,0,0,cv.width,cv.height,0,0,c.width,c.height);PREV=c;
+  }finally{({TH,props,yaw,y0,zm,enemies,balls,wx}=sv)}
+}
+function mapPanel(){
+  const P=PNL(),T=THEMES[sel],fs=Math.max(11,Math.min(17,P.h*.045)),x0=P.x+P.w*.07,mw=P.w*.86;
+  g.save();g.beginPath();g.rect(P.x,P.y,P.w,P.h);g.clip();
+  if(PREV){const k=Math.max(P.w/PREV.width,P.h/PREV.height),w=PREV.width*k,h=PREV.height*k;g.imageSmoothingEnabled=true;g.drawImage(PREV,P.x+(P.w-w)/2,P.y+(P.h-h)/2,w,h)}
+  g.fillStyle='rgba(14,9,5,.6)';g.fillRect(P.x,P.y,P.w,P.h);g.restore();
+  g.strokeStyle='#5a3a18';g.lineWidth=3;g.strokeRect(P.x,P.y,P.w,P.h);g.strokeStyle='rgba(222,200,150,.5)';g.lineWidth=1;g.strokeRect(P.x+4,P.y+4,P.w-8,P.h-8);
+  g.textAlign='left';let y=P.y+fs*2.6;
+  g.font=`800 ${fs*1.9}px ${SERIF}`;g.fillStyle='#f0deaa';g.fillText(T.name,x0,y);y+=fs*1.9;
+  g.font=`700 ${fs}px ${SERIF}`;g.fillStyle='#cdb98a';g.fillText('난이도',x0,y);const lw=g.measureText('난이도 ').width,n=STARS[sel];
+  g.fillStyle='#f2c14e';g.fillText('★'.repeat(n),x0+lw,y);g.fillStyle='#7a6a48';g.fillText('★'.repeat(5-n),x0+lw+g.measureText('★'.repeat(n)).width,y);y+=fs*1.7;
+  g.font=`600 ${fs*.92}px ${SERIF}`;g.fillStyle='#ecdcae';for(const l of wrapL(DESC[sel],mw)){g.fillText(l,x0,y);y+=fs*1.4}
+  y+=fs*.5;g.font=`700 ${fs*.92}px ${SERIF}`;g.fillStyle='#cdb98a';g.fillText('개인 최고 기록',x0,y);y+=fs*1.4;
+  const r=SAVE[T.name];g.font=`600 ${fs*.92}px ${SERIF}`;g.fillStyle='#ecdcae';
+  if(r){g.fillText(`제 ${r.wave}파 · ${r.score}점`,x0,y);g.fillText(`누적 ${r.kills}처치 · ${r.runs}회 플레이`,x0,y+fs*1.4)}else g.fillText('아직 기록이 없습니다',x0,y);
+  const b=STB(),on=inStart();parch(b.x,b.y,b.w,b.h,on);g.textAlign='center';g.fillStyle=on?'#7a1a10':'#2e1a0a';g.font=`800 ${Math.min(22,b.h*.5)}px ${SERIF}`;g.fillText('게임 시작',b.x+b.w/2,b.y+b.h/2+b.h*.17);
 }
 function tutStep(){
   const t=TOOLS.find(o=>o.stage===stage);
